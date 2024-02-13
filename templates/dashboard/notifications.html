@@ -1,0 +1,50 @@
+{% extends 'dashboard/base.html' %}
+{% load static %}
+{% load tz %}
+
+{% block style %}
+<style>
+.notification {
+  padding: 10px 0px;
+  margin: 10px 0px;
+  display: flex;
+  border-bottom: #e9e9e9 solid 1px;
+}
+.icon {
+  margin: 0px 20px;
+  padding: 50px;
+  color: #fff;
+  background: #dc3545;
+  border-radius: 50%;
+}
+.detail {
+  margin-left: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 col-lg-12 col-xl-12">
+        <!-- Notifications -->
+        <div class="card">
+          <div class="card-header">
+            <h4>Notifications</h4>
+          </div>
+          <div class="card-body">
+            {% for notification in notifications %}
+            <div class="notification">
+              <i data-feather="bell"></i>
+              <div class="detail">
+                <span class="message">{{notification.message}}</span><br>
+                <span class="timeframe"><b>{{notification.date|timezone:request.user.timezone|timesince}} ago</b></span>
+              </div>
+              <hr>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <!-- Support tickets -->
+      </div>
+</div>
+{% endblock %}

@@ -1,0 +1,204 @@
+{% extends 'dashboard/base.html' %}
+{% load static %}
+
+{% block style %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+      <h4>Request For A Loan</h4>
+    </div>
+    <div class="card-body">
+      <form class="loan-form" method="post">
+        {% csrf_token %}
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input type="text" class="form-control" id="name" name="name" placeholder="{{request.user.full_name}}" disabled>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="amount">Amount ({{request.user.currency}})</label>
+              <input type="number" class="form-control" id="amount" name="amount" required>
+            </div>
+            <div class="form-group col-md-6">
+              <label for="duration">Duration In Months</label>
+              <select class="form-control" name="duration">
+                <option value="1">1 Month</option>
+                <option value="2">2 Months</option>
+                <option value="3">3 Months</option>
+                <option value="4">4 Months</option>
+                <option value="6">6 Months</option>
+                <option value="9">9 Months</option>
+                <option value="12">12 Months</option>
+                <option value="18">18 Months</option>
+                <option value="24">24 Months</option>
+                <option value="36">36 Months</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Remark</label>
+            <textarea class="form-control" maxlength="755" name="remark" placeholder="Purpose of loan" required></textarea>
+          </div>
+          <div class="form-group">
+            <label for="name">Approximated Monthly Income ({{request.user.currency}})</label>
+            <select class="form-control" name="duration">
+              <option value=2500>Less than 5000</option>
+              <option value=5000>5000-10000</option>
+              <option value=10000>10000-20000</option>
+              <option value=20000>20000-30000</option>
+              <option value=30000>30000-40000</option>
+              <option value=40000>40000-50000</option>
+              <option value=50000>50000-100000</option>
+              <option value=100000>100000-1000000</option>
+              <option value=1000000>Greater than 1000000</option>
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <div class="form-check">
+              <input name="terms" class="form-check-input" type="checkbox" id="terms" required>
+              <label class="form-check-label" for="terms">
+                I agree to the loan terms
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-primary"><span class="btn-text">Submit</span></button>
+        </div>
+      </form>
+
+  </div>
+
+  <div class="row">
+    <div class="col-md-12 col-lg-12 col-xl-12">
+      <div class="card">
+        <div class="card-header">
+          <h4>Your Previous Requests</h4>
+        </div>
+        {% if loans %}
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Amount</th>
+                  <th>Duration (in months)</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for loan in loans %}
+                <tr>
+                  <td>{{loan.amount}}</td>
+                  <td>{{loan.duration_in_months}}</td>
+                  <td>
+                    {% if loan.status == 'active' or loan.status == 'approved' %}
+                    <div class="badge badge-success">{{loan.get_status_display}}</div>
+                    {% elif loan.status == 'pending' %}
+                    <div class="badge badge-warning">{{loan.get_status_display}}</div>
+                    {% else %}
+                    <div class="badge badge-danger">{{loan.get_status_display}}</div>
+                    {% endif %}
+                  </td>
+                  <td><a href="{% url 'banking:loan_detail' loan.id %}" class="btn btn-outline-primary">View</a></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% else %}
+        <div class="card-body">
+          No Previous Loans
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block script %}
+<!-- Sweet Alert -->
+<script src="{% static 'dashboard/bundles/sweetalert/sweetalert.min.js' %}"></script>
+
+
+<script type="text/javascript">
+  let loanForm = document.querySelector('.loan-form'),
+  loanBtn = document.querySelector('.btn'),
+  tableBody = document.querySelector('tbody'),
+  url = "{% url 'banking:process_loan_request' %}";
+  
+  
+  loanForm.addEventListener('submit', (e)=>{
+      e.preventDefault()
+  
+      let amount = parseInt(loanForm["amount"].value),
+      duration = loanForm["duration"].value,
+      remark = loanForm["remark"].value,
+      terms = loanForm["terms"].value,
+      data = null;
+  
+      if (!terms) {
+          swal('Please accept loan terms and condition', {icon: 'warning'});
+      } else {
+          // Loading animation
+          let btnText = loanBtn.querySelector('.btn-text');
+          btnText.innerHTML = `Please wait...<img width='20' src="{% static 'dashboard/img/spinner-white.svg' %}">`;
+          loanBtn.disabled = true;
+          data = {
+              "amount":amount,
+              "duration":duration,
+              "remark":remark
+          }
+  
+          fetch(url, {
+              method: "POST",
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': csrftoken,
+              },
+              body: JSON.stringify(data)
+          })
+          .then((response)=>{
+              return response.json()
+          })
+          .then((data)=>{
+              console.log(data);
+              if (data['status'].toLowerCase() == "success") {
+                  btnText.innerHTML = `SUCCESS`;
+                  loanBtn.disabled = true;
+                  let tableRow = document.createElement('tr'); // 
+                  tableRow.innerHTML = `
+                    <td>${data['loan-amount']}</td>
+                    <td>${data['loan-duration']}</td>
+                    <td>
+                      <div class="badge badge-warning">${data['loan-status']}</div>
+                    </td>
+                    <td><a href="${data['loan-url']}" class="btn btn-outline-primary">View</a></td>
+                  `;
+                  tableBody.appendChild(tableRow);
+                  swal("Loan request was successfully placed and waiting approval", {icon:'success'});
+              } else if (data['status'].toLowerCase() == "failed") {
+                  console.log(data['status']);
+                  btnText.innerHTML = 'Submit';
+                  loanBtn.disabled = false;
+                  swal('Sorry.. Could not place loan request', {icon: 'danger'});
+              } else {
+                  console.log(data['status']);
+                  btnText.innerHTML = 'Submit';
+                  swal(data['message'], {icon: 'warning'});
+              }
+          })
+          .catch((err)=>{
+              console.log(err);
+              btnText.innerHTML = 'Submit';
+              loanBtn.disabled = false;
+              swal('Could not place loan request');
+          })
+      }
+  })
+  </script>
+{% endblock %}
