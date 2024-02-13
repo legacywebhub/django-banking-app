@@ -1,0 +1,156 @@
+{% extends 'dashboard/base.html' %}
+{% load static %}
+
+{% block style %}
+<style>
+.balance-container {
+    margin: 40px 0px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.balance-box {
+    margin: 0px 50px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="section-body">
+    <div class="row">
+      <div class="col-12 col-md-12 col-lg-12">
+        <div class="card">
+          <div class="card-header">
+            <h4>Internal Transfer</h4>
+          </div>
+          <div class="card-body">
+            <div class="balance-container">
+                <div class="balance-box">
+                    <span><i class="fa fa-circle text-success"></i> Main Balance</span>
+                    <span><b>{{request.user.currency}}<span id="balance">{{request.user.balance}}</span></b></span>
+                </div>
+                <div class="balance-box">
+                    <span><i class="fa fa-circle text-secondary"></i> Overdraft</span>
+                    <span><b>{{request.user.currency}}<span id="overdraft">{{request.user.overdraft}}</span></b></span>
+                </div>
+            </div>
+            <form class="transfer-form" method="post">
+              {% csrf_token %}
+              <div class="form-group">
+                <label>Select Account <span class="text-danger">*</span></label>
+                <select class="form-control" name="account">
+                  <option value="balance">Balance</option>
+                  <option value="overdraft">Overdraft</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Bank Name <span class="text-danger">*</span></label>
+                <input type="text" value="{{company.name|title}}" name="bank-name" class="form-control" readonly disabled>
+              </div>
+              <div class="form-group">
+                  <label>Account Number <span class="text-danger">*</span></label>
+                  <input type="text" maxlength="10" placeholder="51***910" name="account-number" class="form-control">
+                  <div id="validate-div">&nbsp;&nbsp;Validating..</div>
+              </div>
+              <div class="form-group">
+                  <label>Amount ({{request.user.currency}}) <span class="text-danger">*</span></label>
+                  <input type="number" maxlength="12" placeholder="$0.00" name="amount" class="form-control">
+              </div>
+              <div class="form-group">
+                  <label>Remark</label>
+                  <textarea class="form-control" maxlength="255" name="remark" placeholder="(Optional)"></textarea>
+              </div>
+              <div class="form-group">
+                  <label>Transaction Pin <span class="text-danger">*</span></label>
+                  <input type="password" maxlength="4" placeholder="****" name="pin" class="form-control">
+              </div>
+              <div class="card-footer text-left">
+                <button class="btn btn-primary mr-1" type="submit"><span class="btn-text">Send</span></button>
+              </div>
+            </form>
+        </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block script %}
+<script>
+  let userBalance = document.querySelector('#balance'),
+  userOverdraft = document.querySelector('#overdraft'),
+  transferForm = document.querySelector('.transfer-form'),
+  transferBtn = transferForm.querySelector('.btn'),
+  url = "{% url 'banking:process_internal_transfer' %}",
+  data = null;
+  
+
+  transferForm.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    let account = transferForm["account"].value;
+
+    if (String(transferForm['pin'].value) == '{{request.user.pin}}') {
+        swal({
+          title: 'Proceed?',
+          text: 'Once transaction is performed, it may not be reversed!',
+          icon: 'warning',
+          buttons: true,
+          dangerMode: true,
+        })
+        .then((arg) => {
+          if (arg) {
+            // Loading animation
+            let btnText = transferBtn.querySelector('.btn-text');
+            btnText.innerHTML = `Please wait...<img width='20' src="{% static 'dashboard/img/spinner-white.svg' %}">`;
+            transferBtn.disabled = true;
+            data = {
+              "account": account,
+              "amount": transferForm["amount"].value,
+              "account_number": transferForm["account-number"].value,
+              "remark": transferForm["remark"].value,
+              "pin": transferForm["pin"].value,
+            };
+
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken,
+                },
+                body: JSON.stringify(data)
+            })
+            .then((response)=>{
+                return response.json()
+            })
+            .then((data)=>{
+                console.log(data);
+                if (data['response'] == "Transfer successful") {
+                  btnText.innerHTML = `Success`;
+                  transferBtn.disabled = true;
+                  userBalance.innerText = data['balance'];
+                  userOverdraft.innerText = data['overdraft'];
+                  swal(data['response'], {icon:'success'});
+                } else {
+                    console.log(data);
+                    btnText.innerHTML = `Send`;
+                    transferBtn.disabled = false;
+                    swal(data['response'], {icon: 'error'});
+                }
+            })
+            .catch((err)=>{
+                console.log(err);
+                btnText.innerHTML = `Send`;
+                transferBtn.disabled = false;
+                swal('Could not perform transfer');
+            })
+          } else {
+            swal('Could not perform transfer');
+          }
+        });
+    } else {
+          swal('Invalid Pin', { icon: 'error',});
+    }
+  })
+</script>
+{% endblock %}
